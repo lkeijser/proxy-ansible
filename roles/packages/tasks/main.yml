@@ -1,0 +1,10 @@
+---
+
+- name: install OS packages
+  apt:
+    pkg={{ item }}
+    state=installed
+  with_items: packages
+  tags:
+    - packages
+

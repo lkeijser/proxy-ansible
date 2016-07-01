@@ -1,0 +1,18 @@
+- name: add Grafana repository
+  copy:
+    src: grafana.repo
+    dest: /etc/yum.repos.d/grafana.repo
+    mode: 0644
+
+- name: Add Package cloud GPG key.
+  rpm_key: state=present key=https://packagecloud.io/gpg.key
+
+- name: Add Grafana GPG key.
+  rpm_key: state=present key=https://grafanarel.s3.amazonaws.com/RPM-GPG-KEY-grafana
+
+- name: install graphite and deps
+  yum: name="{{ item }}" state=present
+  with_items: packages
+
+- name: apache configure port
+  lineinfile: dest=/etc/httpd/conf/httpd.conf regexp="^Listen " line="Listen 127.0.0.1:{{ graphite_ui_port }}"

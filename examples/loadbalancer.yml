@@ -1,0 +1,8 @@
+---
+
+- hosts: haproxy
+
+  roles:
+    - {role: haproxy, haproxy_version: 1.5, haproxy_external_file: "{{target_environment}}/files/loadbalancer/haproxy/haproxy.cfg"}
+
+

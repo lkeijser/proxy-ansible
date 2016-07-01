@@ -1,0 +1,19 @@
+{% set munin            = munin|default({}) %}
+{% set munin_htmldir    = munin.htmldir|default("/var/www/munin") %}
+{% set munin_tmpldir    = munin.tmpldir|default("/etc/munin/templates") %}
+{% if ansible_os_family == 'Debian' %}
+{% set munin_includedir = munin.includedir|default("/etc/munin/munin-conf.d") %}
+{% else %}
+{% set munin_includedir = munin.includedir|default("/etc/munin/conf.d") %}
+{% endif %}
+
+htmldir {{ munin_htmldir }}
+tmpldir {{ munin_tmpldir }}
+includedir {{ munin_includedir }}
+
+{% for host in groups['all'] %}
+[{{ hostvars[host]['ansible_fqdn'] }}]
+    address {{ hostvars[host]['ansible_eth0']['ipv4']['address'] }}
+    use_node_name yes
+
+{% endfor %}

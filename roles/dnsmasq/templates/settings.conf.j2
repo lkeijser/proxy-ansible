@@ -1,0 +1,10 @@
+{% set listen_interface = dnsmasq.listen_interface |default('eth1')  %}
+{% set listen_address   = dnsmasq.listen_address|default('10.0.0.1') %}
+# Managed by CloudVPS, changes will be overwritten. Please do not edit manually.
+{% if listen_interface -%}
+interface={{ listen_interface }}
+bind-interfaces
+{% endif %}
+{% if listen_address -%}
+listen-address={{ listen_address }}
+{% endif %}

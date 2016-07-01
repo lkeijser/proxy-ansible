@@ -1,0 +1,9 @@
+---
+- name: restart apache
+  service: name={{ apache_service }} state=restarted
+
+- name: restart carbon-cache
+  service: name=carbon-cache state=restarted
+
+- name: restart grafana-server
+  service: name=grafana-server state=restarted

@@ -1,0 +1,700 @@
+---
+# deployment.yml 
+# lkeijser@cloudvps.com
+#
+# playbook running multiple plays , for deployment
+# of the 'uber' zip file, fetched after a build
+#
+# the zipfile contains:
+#
+# - api.war         -> backend
+# - payment-hub.zip -> backend
+# - backoffice.zip  -> frontend
+# - doc.zip         -> frontend
+# - liquibase.zip   -> primary postgres node
+#
+# this could be triggered as a post-build-script in
+# jenkins, to automate the process of deployment
+#
+#
+# TODO/NICETOHAVES:
+# - remove hardcoded paths, wherever possible
+# - add more checks (for verification)
+# - write proper systemctl script for docs and backoffice
+#---------------------------------------------------------
+
+
+
+#####
+# local
+#####
+
+- name: log starting datetime
+  hosts: deploy
+  gather_facts: no
+  tasks:
+
+    - name: get deployment datetime
+      shell: date
+      register: curdate
+      tags:
+        - always
+
+    - name: append timestamp to logfile
+      lineinfile:
+        create=yes
+        dest=/root/ansible/{{ target_environment }}/deployment.log
+        insertafter=EOF
+        line="Deployment started on {{ curdate.stdout }}"
+        mode=0644
+      tags:
+        - always
+
+    - name: remove existing deployment.zip file
+      file:
+        path=/tmp/deployment.zip
+        state=absent
+      tags:
+        - deployment
+
+#####
+# build
+#####
+
+- name: fetch deployment zip
+  hosts: build
+  gather_facts: no
+  tasks:
+
+    - name: fetch deployment.zip  
+      fetch:
+        src=/var/lib/jenkins/jobs/certo_production_deployment/workspace/deployment.zip
+        flat=yes
+        dest=/tmp/
+      tags:
+        - deployment
+
+
+- name: unpack zipfile 
+  hosts: deploy
+  gather_facts: no
+  tasks:
+
+    - name: remove existing work dir
+      file:
+        path=/tmp/deployment
+        state=absent
+
+    - name: create work dir
+      file:
+        path=/tmp/deployment
+        state=directory
+        mode=0700
+      tags:
+        - deployment
+
+    - name: unpack deployment file
+      unarchive:
+        src=/tmp/deployment.zip
+        dest=/tmp/deployment/
+        copy=no
+      tags:
+        - deployment
+
+    - name: grab version from deployment file
+      shell: cat /tmp/deployment/version
+      register: deployversion
+      tags:
+        - deployment
+        - logstuff
+
+    - name: add version to logfile
+      shell: echo "Currently deploying version {{ deployversion.stdout }}" >> /root/ansible/{{ target_environment }}/deployment.log
+
+    - name: deploying version
+      debug: msg="Now deploying version {{ deployversion.stdout }}"
+
+      tags:
+        - logstuff
+
+
+######
+# liquibase
+#####
+ 
+- name: copy and install liquibase
+  hosts: postgresvip
+  gather_facts: no
+  tasks:
+
+    - name: check of db backup dir exists
+      stat: path=/var/lib/pgsql/backups
+      register: dbbackupdir
+      tags:
+        - liquibase
+
+    - name: create db backup dir if it does not exist
+      file:
+        path=/var/lib/pgsql/backups
+        owner=postgres
+        group=postgres
+        mode=0700
+      when: not dbbackupdir.stat.exists
+      tags:
+        - liquibase
+
+    - name: grab timestamp for db backup filename
+      shell: date +"%Y%m%d%H%M"
+      register: ts
+      tags:
+        - liquibase
+
+    - name: get current deployed artifacts version
+      uri:
+        url=http://10.0.0.41:8080/api/version
+      register: buildver
+      tags:
+        - liquibase
+        - skipdump
+
+    - name: make backup of current database
+      sudo: true
+      sudo_user: postgres
+      shell: pg_dump -d certo -F tar | gzip -c > /var/lib/pgsql/backups/certo-{{ buildver.json['buildVersion'] }}-{{ ts.stdout }}.sql.tar.gz
+      tags:
+        - liquibase
+        - skipdump
+
+    - name: database backup
+      debug: msg="a backup of the database was created in /var/lib/pgsql/backups/certo-{{ buildver.json['buildVersion'] }}-{{ ts.stdout }}.sql.tar.gz"
+      tags:
+        - liquibase
+        - skipdump
+
+    - name: check if work dir exists
+      stat: path=/tmp/artifacts/liquibase
+      register: workdir
+      tags:
+        - liquibase 
+
+    - name: remove existing work dir
+      file:
+        path=/tmp/artifacts/liquibase
+        state=absent
+      when: workdir.stat.exists
+      tags:
+        - liquibase 
+
+    - name: create work dir
+      file:
+        path=/tmp/artifacts/liquibase
+        state=directory
+        recurse=true
+        mode=0700
+      tags:
+        - liquibase 
+
+    - name: unpack deployment file
+      unarchive:
+        src=/tmp/deployment/liquibase.zip
+        dest=/tmp/artifacts/liquibase
+      tags:
+        - liquibase
+
+    - name: update liquibase.jar
+      shell: java -jar liquibase.jar --contexts=production --defaultsFile=/tmp/artifacts/liquibase/db.properties --changeLogFile=database/master-and-data.xml update chdir=/tmp/artifacts/liquibase
+      tags:
+        - liquibase
+
+
+
+#####
+# payment-hub (unpack and modify configuration)
+#####
+- name: payment-hub
+  hosts: deploy
+  gather_facts: no
+  tasks:
+
+    - name: check if payment-hub temp dir exists
+      stat: path=/tmp/paymenthubtmp
+      register: paymenthubtmpdir
+      tags:
+        - paymenthub
+
+    - name: remove old payment-hub temp dir
+      file:
+        path=/tmp/paymenthubtmp
+        state=absent
+      when: paymenthubtmpdir.stat.exists
+      tags:
+        - paymenthub
+
+    - name: create payment-hub temp dir
+      file:
+        path=/tmp/paymenthubtmp
+        mode=0700
+        state=directory
+      tags:
+        - paymenthub
+
+    - name: unpack payment-hub since it contains the configuration file
+      unarchive:
+        src=/tmp/deployment/payment-hub.zip
+        dest=/tmp/paymenthubtmp
+        copy=no
+      tags:
+        - paymenthub
+
+    # at this point, the server override configuration template should
+    # now exist at: /tmp/paymenthubtmp/config/application-override.properties
+    # this file should be used by ansible as a template and then pushed to the
+    # backend hosts, inside the payment-hub directory, before starting payment-hub but
+    # after cleaning up the old directory (if applicable)
+
+#####
+# api.war (unpack and modify configuration)
+#####
+
+    - name: check if api.war temp dir exists
+      stat: path=/tmp/apiwartmp
+      register: apiwartmpdir
+      tags:
+        - api
+
+    - name: remove old api.war temp dir
+      file:
+        path=/tmp/apiwartmp
+        state=absent
+      when: apiwartmpdir.stat.exists
+      tags:
+        - api
+
+    - name: create api.war temp dir
+      file:
+        path=/tmp/apiwartmp
+        mode=0700
+        state=directory
+      tags:
+        - api
+
+    - name: unpack api.war since it contains the configuration file
+      unarchive:
+        src=/tmp/deployment/api.war
+        dest=/tmp/apiwartmp
+        copy=no
+      tags:
+        - api
+
+    # at this point, the server override configuration template should
+    # now exist at: /tmp/apiwartmp/WEB-INF/classes/config/application-override.properties
+    # this file should be used by ansible as a template and then pushed to the
+    # backend hosts, inside the tomcat directory, before starting tomcat but
+    # after cleaning up the old directory (if applicable)
+
+#####
+# api.war
+#####
+ 
+- name: copy and install api.war
+  hosts: backend
+  gather_facts: no
+  tasks:
+
+    - name: ensure directory exists for storing global scripts
+      file:
+        path=/etc/certo
+        state=directory
+        mode=0755
+      tags:
+        - globalenv
+
+    - name: copy global settings file
+      copy:
+        src={{ target_environment }}/files/global/setenv.sh
+        dest=/etc/certo/setenv.sh
+        mode=0755
+      tags:
+        - globalenv
+
+    - name: stop tomcat
+      shell: /usr/sbin/crm resource stop tomcat
+      run_once: true
+      tags:
+        - api
+        - stopallservices
+
+    - name: pause for 10s while tomcat finishes
+      pause: seconds=10
+      tags:
+        - api
+
+    - name: delete old api directory
+      file:
+        path=/opt/apache-tomcat-8.0.22/webapps/api/
+        state=absent
+      tags:
+        - api
+
+    - name: delete old api.war
+      file:
+        path=/opt/apache-tomcat-8.0.22/webapps/api.war
+        state=absent
+      tags:
+        - api
+
+    - name: copy api.war file 
+      copy:
+        src=/tmp/deployment/api.war
+        dest=/opt/apache-tomcat-8.0.22/webapps/api.war
+        owner=tomcat
+        group=tomcat
+      tags:
+        - api
+
+    # now is the time to copy over the serveroverride.properties file
+    # if it exists
+    - include_vars: "vars/passwords.yml"
+
+    - name: copy travel module template to backend hosts
+      template:
+        src=/tmp/apiwartmp/WEB-INF/classes/config/serveroverride.properties
+        dest=/opt/tomcat/conf/serveroverride.properties
+        mode=0600
+        owner=tomcat
+        group=tomcat
+      tags:
+        - api
+
+    - name: copy extra env file for tomcat
+      copy:
+        src={{ target_environment }}/files/backend/tomcat/setenv.sh
+        dest=/opt/tomcat/bin/setenv.sh
+        mode=0700
+        owner=tomcat
+        group=tomcat
+      tags:
+        - api
+
+
+- name: manage tomcat service on active host 
+  hosts: backendvip
+  gather_facts: no
+  tasks:
+
+    - name: start tomcat
+      shell: /usr/sbin/crm resource start tomcat
+      tags:
+        - api
+        - startallservices
+
+    - name: pause for 10s while cluster tasks finish
+      pause: seconds=10
+
+    - name: wait for api.war to be unpacked by tomcat
+      wait_for: 
+        path=/opt/apache-tomcat-8.0.22/webapps/api/META-INF/MANIFEST.MF
+        timeout=300 # 5m should be enough
+      tags:
+        - api
+        - startallservices
+
+#####
+# payment-hub
+#####
+- name: deploy  payment-hub files
+  hosts: backend
+  gather_facts: no
+  tasks:
+
+    - name: stop payment-hub service
+      shell: /usr/sbin/crm resource stop payment-hub-boot
+      run_once: true
+      tags:
+        - payment-hub
+        - stopallservices
+
+    - name: pause for 10s while cluster tasks finish
+      pause: seconds=10
+
+    - name: check if previous version exists
+      stat: path=/opt/certo/payment-hub_bak
+      register: prev_ver_dir
+      tags:
+        - payment-hub
+
+    - name: remove previous version 
+      file:
+        path=/opt/certo/payment-hub_bak
+        state=absent
+      when: prev_ver_dir.stat.exists
+      tags:
+        - payment-hub
+
+    - name: backup current version
+      shell: mv /opt/certo/payment-hub /opt/certo/payment-hub_bak
+      ignore_errors: yes
+      tags:
+        - payment-hub
+
+    - name: remove payment-hub
+      file:
+        path=/opt/certo/payment-hub
+        state=absent
+      tags:
+        - payment-hub
+
+    - name: create new payment-hub directory
+      file:
+        path=/opt/certo/payment-hub
+        state=directory
+      tags:
+        - payment-hub
+
+    - name: unpack payment-hub zipfile
+      unarchive:
+        src=/tmp/deployment/payment-hub.zip
+        dest=/opt/certo/payment-hub
+      tags:
+        - payment-hub
+
+    - name: change paths in script
+      replace:
+        dest=/opt/certo/payment-hub/bin/payment-hub-boot-conf.sh
+        regexp='(JAVA_HOME)=.*'
+        replace='\1=/usr/java/jdk1.8.0_45/jre'
+      tags:
+        - payment-hub
+
+    # now is the time to copy over the application-override.properties file
+    # if it exists
+    - include_vars: "vars/passwords.yml"
+
+    - name: copy payment-hub template to backend hosts
+      template:
+        src=/tmp/paymenthubtmp/config/application-override.properties
+        dest=/opt/certo/payment-hub/config/application-override.properties
+        mode=0600
+      tags:
+        - payment-hub
+
+- name: deploy payment-hub files
+  hosts: backendvip
+  gather_facts: no
+  tasks:
+
+    - name: start payment-hub service again
+      shell: /usr/sbin/crm resource start payment-hub-boot
+      tags:
+        - payment-hub
+        - startallservices
+    
+    - name: pause for 10s while cluster tasks finish
+      pause: seconds=10
+
+    - name: cleanup services in case something went wrong
+      shell: /usr/sbin/crm resource cleanup tomcat
+      tags:
+        - tomcat
+
+    - name: pause for 10s while cluster tasks finish
+      pause: seconds=10
+
+    - name: cleanup services in case something went wrong
+      shell: /usr/sbin/crm resource cleanup payment-hub-boot
+      tags:
+        - payment-hub
+
+######
+# backoffice
+#####
+
+- name: copy and install backoffice
+  hosts: frontend
+  gather_facts: no
+  tasks:
+
+    - name: ensure directory exists for storing global scripts
+      file:
+        path=/etc/certo
+        state=directory
+        mode=0755
+      tags:
+        - globalenv
+
+    - name: copy global settings file
+      copy:
+        src={{ target_environment }}/files/global/setenv.sh
+        dest=/etc/certo/setenv.sh
+        mode=0755
+      tags:
+        - globalenv
+
+    - name: stop backoffice service
+      shell: service backoffice-boot stop
+      ignore_errors: yes
+      tags:
+        - backoffice
+        - stopallservices
+
+    - name: check if previous version exists
+      stat: path=/opt/certo/backoffice_bak
+      register: prev_ver_dir
+      tags:
+        - backoffice
+
+    - name: remove previous version 
+      file:
+        path=/opt/certo/backoffice_bak
+        state=absent
+      when: prev_ver_dir.stat.exists
+      tags:
+        - backoffice
+
+    - name: backup current version
+      shell: mv /opt/certo/backoffice /opt/certo/backoffice_bak
+      ignore_errors: yes
+      tags:
+        - backoffice
+
+    - name: remove backoffice
+      file:
+        path=/opt/certo/backoffice
+        state=absent
+      tags:
+        - backoffice
+
+    - name: create new backoffice directory
+      file:
+        path=/opt/certo/backoffice
+        state=directory
+      tags:
+        - backoffice
+
+    - name: unpack backoffice zipfile
+      unarchive:
+        src=/tmp/deployment/backoffice.zip
+        dest=/opt/certo/backoffice
+      tags:
+        - backoffice
+
+    - name: change paths in script
+      replace:
+        dest=/opt/certo/backoffice/bin/backoffice-boot-conf.sh
+        regexp='(JAVA_HOME)=.*'
+        replace='\1=/usr/java/jdk1.8.0_45/jre'
+      tags:
+        - backoffice
+
+    - name: start backoffice service again
+      shell: /etc/init.d/backoffice-boot start
+      tags:
+        - backoffice
+        - startallservices
+    
+    - name: wait for backoffice port to become available
+      wait_for:
+        port=8080
+        timeout=60 # should come up fairly fast
+      tags:
+        - backoffice
+        - startallservices
+
+#####
+## docs (still same play , also on frontend)
+#####
+    - name: stop docs service
+      shell: service doc-boot stop
+      ignore_errors: yes
+      tags:
+        - docs
+        - stopallservices
+
+    - name: check if previous version exists
+      stat: path=/opt/certo/docs_bak
+      register: prev_docs_dir
+      tags:
+        - docs
+
+    - name: remove previous version 
+      file:
+        path=/opt/certo/docs_bak
+        state=absent
+      when: prev_docs_dir.stat.exists
+      tags:
+        - docs
+
+    - name: backup current version
+      shell: mv /opt/certo/docs /opt/certo/docs_bak
+      ignore_errors: yes
+      tags:
+        - docs
+
+    - name: remove docs
+      file:
+        path=/opt/certo/docs
+        state=absent
+      tags:
+        - docs
+
+    - name: create new docs directory
+      file:
+        path=/opt/certo/docs
+        state=directory
+      tags:
+        - docs
+
+    - name: unpack docs zipfile
+      unarchive:
+        src=/tmp/deployment/doc.zip
+        dest=/opt/certo/docs
+      tags:
+        - docs
+
+    - name: change paths in script
+      replace:
+        dest=/opt/certo/docs/bin/doc-boot-conf.sh
+        regexp='(JAVA_HOME)=.*'
+        replace='\1=/usr/java/jdk1.8.0_45/jre'
+      tags:
+        - docs
+
+    - name: start docs service again
+      shell: /etc/init.d/doc-boot start
+      tags:
+        - docs
+        - startallservices
+    
+    - name: wait for docs port to become available
+      wait_for:
+        port=8181
+        timeout=60 # should come up fairly fast
+      tags:
+        - docs
+        - startallservices
+
+#####
+# local
+#####
+
+- name: log end datetime
+  hosts: deploy
+  gather_facts: no
+  tasks:
+
+    - name: get deployment datetime
+      shell: date
+      register: curdate
+      tags:
+        - always
+
+    - name: append timestamp to logfile
+      lineinfile:
+        create=yes
+        dest=/root/ansible/{{ target_environment }}/deployment.log
+        insertafter=EOF
+        line="Deployment finished on {{ curdate.stdout }}"
+        mode=0644
+      tags: 
+        - always
+

@@ -1,0 +1,16 @@
+[loadbalancer]
+lb2.clusterklant
+lb1.clusterklant
+
+[appserver]
+app1.clusterklant
+app2.clusterklant
+
+[sqlserver]
+sql1.clusterklant
+sql2.clusterklant
+
+[acceptance:children]
+loadbalancer
+appserver
+sqlserver

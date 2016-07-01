@@ -1,0 +1,73 @@
+---
+
+- hosts: drbd
+  roles:
+    - {role: corosync, tags: corosync, host_group: "drbd", heartbeat_nic: 'eth1', heartbeat_hosts: ['drbd1', 'drbd2']}
+    - iptables
+
+  tasks:
+  - name:  install drbd packages
+    apt:
+      pkg={{ item }}
+      state=present
+    with_items:
+      - drbd8-utils
+      - drbdlinks
+    tags:
+      - drbd
+
+  - name: copy drbd resource file
+    copy:
+      src=files/storage/drbd/r0.res
+      dest=/etc/drbd.d/r0.res
+    tags:
+      - drbd
+
+
+  - name: ensure drbd mountpoint exists
+    file:
+      path=/mnt/export
+      state=directory
+    tags:
+      - drbd
+
+  - name: ensure drbd service does not autostart at boot
+    service:
+      name=drbd
+      enabled=false
+    tags:
+      - drbd
+
+  - name: install NFS related packages
+    apt:
+      pkg=nfs-kernel-server
+      state=present
+    tags:
+      - nfs
+
+  - name: ensure NFS does not autostart at boot
+    service:
+      name=nfs-kernel-server
+      enabled=false
+    tags:
+      - nfs
+
+  - name: pin NFS statd to specific ports
+    lineinfile:
+      dest=/etc/default/nfs-common
+      regexp="^STATDOPTS=" backrefs=yes
+      line=STATDOPTS='"--port 32765 --outgoing-port 32766"'
+      state=present
+    tags:
+      - nfs
+
+  - name: pin NFS mountd to specific ports
+    lineinfile:
+      dest=/etc/default/nfs-kernel-server
+      regexp="^RPCMOUNTDOPTS=.*"
+      line=RPCMOUNTDOPTS='"--manage-gids -p 32767"'
+      state=present
+    tags:
+      - nfs
+
+

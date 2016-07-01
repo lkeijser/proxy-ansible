@@ -1,0 +1,10 @@
+---
+
+postgres:
+  data_dir: /var/lib/postgresql/9.3/main/
+  network: 10.70.35.0/24
+
+databases:
+  - name: klant
+    owner: klant
+

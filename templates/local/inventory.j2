@@ -1,0 +1,9 @@
+# Auto generated inventory for {{ customer }} / {{ clustername }}
+# This file needs the auto generated configuration for ssh.
+{% for groupname in cluster_hosts|groupby('group') %}
+
+[{{ groupname.grouper }}]
+{% for item in groupname.list %}
+{{ item.name }}.{{ clustername }}
+{% endfor %}
+{% endfor %}

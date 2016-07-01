@@ -1,0 +1,5 @@
+---
+
+- name: reload interface
+  shell: ifdown eth0 && ifup eth0
+  tags: static-network

@@ -1,0 +1,6 @@
+---
+
+munin_htmldir: /var/www/munin
+
+munin_allowed_ip_addresses:
+  - 79.170.89.58  # CloudVPS jumphost

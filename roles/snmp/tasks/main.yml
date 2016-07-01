@@ -1,0 +1,36 @@
+---
+
+- name: install snmpd package
+  apt:
+    pkg=snmpd
+    state=installed
+  tags:
+    - snmp
+
+- name: configure snmpd.conf
+  template: 
+    src=snmpd.conf.j2
+    dest=/etc/snmp/snmpd.conf
+    backup=yes
+  notify:
+    - restart snmpd
+  tags:
+    - snmp
+
+- name: configure default snmpd configuration
+  template: 
+    src=snmpd.j2
+    dest=/etc/default/snmpd
+    backup=yes
+  notify:
+    - restart snmpd
+  tags:
+    - snmp
+
+- name: ensure snmpd is running
+  service:
+    name=snmpd
+    state=started
+    pattern=/usr/sbin/snmpd
+  tags:
+    - snmp

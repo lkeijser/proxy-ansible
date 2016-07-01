@@ -1,0 +1,9 @@
+---
+
+whitelist:
+  - 127.0.0.1        # Localhost
+  - 192.168.0.1/16   # Internal network
+  - 10.0.0.0/16      # Internal network
+  - 79.170.89.58     # CLoudVPS support 
+  - 79.170.89.59     # CLoudVPS support 
+  - 194.60.207.22    # CLoudVPS support 

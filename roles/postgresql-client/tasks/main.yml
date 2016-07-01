@@ -1,0 +1,24 @@
+---
+
+# Make sure the postgres apt-repository is present
+- name: Add postgresql repository apt-key
+  apt_key:
+    id=ACCC4CF8
+    url="https://www.postgresql.org/media/keys/ACCC4CF8.asc"
+    state=present
+  tags:
+    - pgclient
+
+- name: Add postgresql repository
+  apt_repository:
+    repo="deb http://apt.postgresql.org/pub/repos/apt/ {{ansible_distribution_release}}-pgdg main"
+    state=present
+  tags:
+    - pgclient
+
+- name: Installing postgres client
+  apt:
+    name=postgresql-client-9.3
+    state=present
+  tags:
+    - pgclient

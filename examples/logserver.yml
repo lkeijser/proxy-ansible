@@ -1,0 +1,6 @@
+---
+
+- hosts: metrics
+
+  roles:
+    - metrics

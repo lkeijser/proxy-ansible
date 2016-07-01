@@ -1,0 +1,28 @@
+##############################
+# Cluster {{ clustername }} {{ customer }}
+
+{% for item in cluster_hosts %}
+{% if item.group == "loadbalancer" %}
+Host {{ item.name }}.{{ clustername }} {{ clustername }}.{{ item.name }}
+  Hostname {{ item.ip }}
+
+{% endif %}
+{% if item.external is defined %}
+Host {{ item.name }}.{{ clustername }} {{ clustername }}.{{ item.name }}
+  Hostname {{ item.ip }}
+
+{% endif %}
+{% if item.group != "loadbalancer" %}
+Host {{ item.name }}.{{ clustername }} {{ clustername }}.{{ item.name }}
+  Hostname {{ item.ip }}
+  ProxyCommand ssh {{ cluster_entry_ip }} exec nc %h %p 2>/dev/null
+  HashKnownHosts no
+  StrictHostKeyChecking no
+  PermitLocalCommand yes
+  LocalCommand sed -Eni '/^%h/!p' ~/.ssh/known_hosts
+
+{% endif %}
+{% endfor %}
+
+# / Cluster {{ clustername }} {{ customer }}
+##############################

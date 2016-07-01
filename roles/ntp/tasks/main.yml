@@ -1,0 +1,24 @@
+---
+
+- name: install ntp packages
+  apt:
+    pkg=ntp
+    state=installed
+  register: ntp_install
+  tags:
+    - ntp
+
+- name: Set ntp clock sync
+  command: ntpd -gq
+  when: ntp_install|changed
+  ignore_errors: yes
+  failed_when: False
+  tags:
+    - ntp
+
+- name: ensure ntpd is running
+  service:
+    name=ntp
+    state=started
+  tags:
+    - ntp

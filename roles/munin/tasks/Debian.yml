@@ -1,0 +1,153 @@
+---
+
+- name: install munin-server and dependencies
+  apt:
+    name={{ item }}
+    state=present
+    update_cache=yes
+  with_items:
+    - munin
+    - apache2
+    - libcgi-fast-perl
+  when: munin_server is defined
+  tags:
+    - munin
+    - munin-server
+
+- name: install munin-node
+  apt:
+    name=munin-node
+    state=present
+  tags:
+    - munin
+    - munin-node
+
+- name: install extra munin plugins on munin nodes
+  apt:
+    name=munin-plugins-extra
+    state=present
+  notify:
+    - restart munin-node
+  tags:
+    - munin
+    - munin-server
+    - munin-node
+
+- name: copy template for munin server if applicable
+  template:
+    src=munin.conf.j2
+    dest=/etc/munin/munin.conf
+  when: munin_server is defined
+  tags:
+    - munin
+    - munin-server
+
+- name: copy template for munin-node
+  template:
+    src=munin-node.conf.j2
+    dest=/etc/munin/munin-node.conf
+  notify:
+    - restart munin-node
+  tags:
+    - munin
+    - munin-node
+
+- name: enable all suggested plugins
+  shell: /usr/sbin/munin-node-configure --shell 2>/dev/null | sh && touch /etc/munin/.suggests
+  args: 
+    creates: /etc/munin/.suggests
+  notify:
+    - restart munin-node
+  tags:
+    - munin
+    - munin-node
+
+- name: ensure munin-node is running and enabled
+  service:
+    name=munin-node
+    state=running
+    enabled=yes
+  tags:
+    - munin
+    - munin-node
+
+- name: ensure apache is running and enabled on munin server
+  service:
+    name=apache2
+    state=running
+    enabled=yes
+  when: munin_server is defined
+  tags:
+    - munin
+    - munin-server
+
+- name: create munin www dir if applicable
+  file:
+    path=/var/www/munin
+    state=directory
+    owner=munin
+    group=munin
+    mode=0755
+  when: munin_server is defined
+  tags:
+    - munin
+    - munin-server
+
+- name: create apache config for munin according to external template
+  template:
+    src={{ munin_apache_external_template }}
+    dest=/etc/apache2/conf-available/munin.conf
+  when: 
+    - munin_server is defined
+    - munin_apache_external_template is defined
+  notify:
+    - reload apache
+  tags:
+    - munin
+    - munin-server
+
+- name: find the current apache version
+  shell: "/usr/sbin/apache2ctl -v | awk '/Server version/ {print $3}' | cut -f2 -d/ | cut -f1-2 -d."
+  register: apache_version
+  when: munin_server is defined
+  tags: 
+    - munin
+    - munin-server
+
+- name: create apache2.2 config for munin if applicable
+  template:
+    src=apache.conf.j2
+    dest=/etc/apache2/sites-available/munin.conf
+  when: 
+    - munin_server is defined
+    - munin_apache_external_template is undefined
+    - apache_version.stdout | version_compare('2.2','<=')
+  notify:
+    - reload apache
+  tags:
+    - munin
+    - munin-server
+
+- name: create apache2.4 config for munin if applicable
+  template:
+    src=apache.conf.j2
+    dest=/etc/apache2/conf-available/munin.conf
+  when: 
+    - munin_server is defined
+    - munin_apache_external_template is undefined
+    - apache_version.stdout | version_compare('2.4','>=')
+  notify:
+    - reload apache
+  tags:
+    - munin
+    - munin-server
+
+- name: enable apche cgi module if applicable
+  shell: /usr/sbin/a2enmod cgi 
+  args:
+    creates: /etc/apache2/mods-enabled/cgid.load
+  when: munin_server is defined
+  notify: restart apache 
+  tags:
+    - munin
+    - munin-server

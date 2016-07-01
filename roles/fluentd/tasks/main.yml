@@ -1,0 +1,39 @@
+---
+
+- name: ensure python support packages are installed
+  apt:
+    pkg={{ item }}
+    state=installed
+  with_items:
+    - python-apt
+    - python-pycurl
+  tags:
+    - fluentd
+
+- name: install fluentd (Treasure) key
+  apt_key: 
+    url='http://packages.treasure-data.com/debian/RPM-GPG-KEY-td-agent'
+    state=present
+  tags:
+    - fluentd
+
+- name: install fluentd sources
+  apt_repository: 
+    repo='deb http://packages.treasure-data.com/precise/ precise contrib' 
+    state=present
+  tags:
+    - fluentd
+
+- name: install fluentd packages 
+  apt:
+    name=td-agent
+    state=installed
+  tags:
+    - fluentd
+
+- name: ensure fluentd is running
+  service: 
+    name=td-agent 
+    state=started
+  tags:
+    - fluentd

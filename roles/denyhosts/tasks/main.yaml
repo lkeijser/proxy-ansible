@@ -1,0 +1,48 @@
+---
+
+- name: install denyhosts
+  apt:
+    pkg=denyhosts
+    state=installed
+  register: installation_debian
+  tags:
+    - denyhosts
+
+- name: set root threshold to 5
+  lineinfile:
+    dest=/etc/denyhosts.conf
+    regexp='^DENY_THRESHOLD_ROOT'
+    line='DENY_THRESHOLD_ROOT = 5'
+    backup=yes
+  when: installation_debian|changed
+  when: ansible_os_family == "Debian"
+  tags:
+    - denyhosts
+
+- name: set purge config to 1h
+  lineinfile:
+    dest=/etc/denyhosts.conf
+    regexp='^PURGE_DENY ='
+    line='PURGE_DENY = 1h'
+    backup=yes
+  when: installation_debian|changed
+  when: ansible_os_family == "Debian"
+  tags:
+    - denyhosts
+
+- name: add whitelist ip's to /etc/hosts.allow
+  lineinfile:
+    dest=/etc/hosts.allow
+    regexp='^ALL:{{ item }}$'
+    line='ALL:{{ item }}'
+    backup=yes
+  with_items: whitelist
+  tags:
+    - denyhosts
+
+- name: start denyhosts
+  service: 
+    name=denyhosts
+    state=started
+  tags:
+    - denyhosts

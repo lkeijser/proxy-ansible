@@ -1,0 +1,45 @@
+---
+
+- name: create docroot
+  file:
+    path={{ item.value.docroot }}
+    state=directory
+    owner={{ item.value.webuser }}
+    group={{ item.value.webuser }}
+  with_dict: apache_vhost
+  when: apache_vhost is defined
+  tags:
+    - apache-vhost
+
+- name: find the current apache version
+  shell: "/usr/sbin/apache2ctl -v | awk '/Server version/ {print $3}' | cut -f2 -d/ | cut -f1-2 -d."
+  register: apache_version
+  tags: apache-vhost
+
+- debug:
+    msg: "You are using Apache version {{ apache_version.stdout }}"
+  tags: apache-vhost
+
+- name: create vhost in apache site enabled
+  template:
+    src=vhost-conf.j2
+    dest=/etc/apache2/sites-available/{{ item.value.prio }}-{{ item.value.name }}.conf
+  with_dict: apache_vhost
+  notify: reload apache
+  tags: apache-vhost
+
+- name: enable vhost for apache 2.2
+  command: a2ensite {{ item.value.prio }}-{{ item.value.name }}.conf
+    creates=/etc/apache2/sites-enabled/{{ item.value.prio }}-{{ item.value.name }}.conf
+  with_dict: apache_vhost
+  when: apache_vhost is defined and apache_version.stdout | version_compare('2.2','<=')
+  notify: reload apache
+  tags: apache-vhost
+
+- name: enable vhost for apache 2.4
+  command: a2ensite {{ item.value.prio }}-{{ item.value.name }}
+    creates=/etc/apache2/sites-enabled/{{ item.value.prio }}-{{ item.value.name }}.conf
+  with_dict: apache_vhost
+  when: apache_vhost is defined and apache_version.stdout | version_compare('2.4','>=')
+  notify: reload apache
+  tags: apache-vhost

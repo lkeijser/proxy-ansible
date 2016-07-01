@@ -1,0 +1,9 @@
+---
+
+- name: install postgresql.conf
+  template:
+    src=postgresql.conf.j2
+    dest="/etc/postgresql/{{postgresql_version|default('9.3')}}/main/postgresql.conf"
+  notify: restart postgresql
+  tags:
+    - postgresql

@@ -1,0 +1,26 @@
+{% set munin_server_ip    = munin.server_ip|default("10.0.0.1") %}
+{% set munin_port         = munin.port|default("4949") %}
+
+log_level 5
+{% if ansible_os_family == 'Debian' %}
+log_file /var/log/munin/munin-node.log
+{% else %}
+log_file /var/log/munin-node/munin-node.log
+{% endif %}
+pid_file /var/run/munin/munin-node.pid
+background 1
+setsid 1
+user root
+group root
+#ignore_file [\#~]$
+ignore_file DEADJOE$
+ignore_file \.bak$
+ignore_file %$
+ignore_file \.dpkg-(tmp|new|old|dist)$
+ignore_file \.rpm(save|new)$
+ignore_file \.pod$
+allow ^127\.0\.0\.1$
+allow ^::1$
+allow ^{{ munin_server_ip | regex_replace('\.', '\\\.') }}$
+host {{ ansible_default_ipv4.address }}
+port {{ munin_port }}

@@ -1,0 +1,10 @@
+---
+
+- name: install sendmail
+  apt:
+    pkg={{ item }}
+    state=installed
+  with_items: sendmail
+  when: sendmail is not defined
+  tags:
+    - sendmail

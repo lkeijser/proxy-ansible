@@ -1,0 +1,27 @@
+---
+
+- name: install dnsmasq package
+  apt:
+    pkg=dnsmasq
+    state=installed
+  tags:
+    - dnsmasq
+
+- name: set dnsmasq template
+  template:
+    src=settings.conf.j2
+    dest=/etc/dnsmasq.d/settings.conf
+  when: dnsmasq is defined
+  notify:
+    - reload dnsmasq
+  tags:
+    - dnsmasq
+
+- name: ensure dnsmasq is running
+  service: 
+    name=dnsmasq 
+    state=started
+  tags:
+    - dnsmasq
+
+

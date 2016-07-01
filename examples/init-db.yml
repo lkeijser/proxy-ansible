@@ -1,0 +1,42 @@
+---
+# This playbook will initialize the database setup for the first
+# run, and should not run twice. This is typically run after the
+# deploy run for a platform (re)build.
+
+# - hosts: all:!localhost
+#   gather_facts: true
+
+- hosts: sqlserver
+  vars_files:
+    - "{{target_environment}}/vars/init_database.yml"
+  tasks:
+
+    - name: start postgres
+      service:
+        name=postgresql
+        state=started
+
+    - name: create database user
+      sudo: yes
+      sudo_user: postgres
+      postgresql_user:
+          name="{{ item.username }}"
+          password="{{ item.password }}"
+      with_items: db_users
+
+    - name: create databases
+      sudo: yes
+      sudo_user: postgres
+      postgresql_db:
+         name="{{ item.name }}"
+         owner="{{ item.owner }}"
+      with_items: databases
+      notify:
+        - restart postgresql
+
+  handlers:
+    - name: restart postgresql
+      service:
+        name=postgresql
+        state=restarted
+

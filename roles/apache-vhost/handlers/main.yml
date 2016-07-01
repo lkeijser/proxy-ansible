@@ -1,0 +1,4 @@
+---
+
+- name: reload apache
+  shell: /etc/init.d/apache2 reload

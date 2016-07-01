@@ -1,0 +1,7 @@
+- debug: msg="{{ ansible_default_ipv4.address }}"
+  tags: static-interface
+
+- name: Change the network configuration file to be static defined
+  template: src=interfaces.j2 dest=/etc/network/interfaces
+  notify: reload interface
+  tags: static-interface

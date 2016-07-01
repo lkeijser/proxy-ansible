@@ -1,0 +1,97 @@
+---
+
+- name: ensure repostory packges are installed
+  apt:
+    pkg={{ item }}
+    state=installed
+  with_items:
+    - python-apt
+    - python-pycurl
+  tags:
+    - repository
+  tags:
+    - nrpe
+
+- name: prepare keys for cloudvps repository
+  apt_key:
+    url=http://keyserver.ubuntu.com/pks/lookup?op=get&search=0xBCF6D4908106D28F
+    state=present
+    id=8106D28F
+  tags:
+    - repository
+  tags:
+    - nrpe
+
+- name: prepare the cloudvps repository
+  apt_repository: 
+    repo='deb [arch=amd64] http://packages.cloudvps.com/ precise main'
+    state=present
+  tags:
+    - repository
+  tags:
+    - nrpe
+
+- name: install the xlis-nagios-sla-checks package
+  apt:
+    pkg=xlis-nagios-sla-checks
+    state=installed
+  tags:
+    - repository
+  tags:
+    - nrpe
+
+- name: install the nagios-nrpe-plugin package
+  apt: 
+    pkg=nagios-nrpe-plugin
+    install_recommends=no
+    state=installed
+  when: nrpe_proxy is defined
+  tags:
+    - nrpe
+
+- name: copy nrpe check scripts
+  copy: 
+    dest=/etc/nagios/nrpe.d/{{ item }}
+    src={{ item }}
+    backup=yes
+  with_items:
+    - xls_check_nrpe_1arg.cfg
+    - xls_check_nrpe.cfg
+    - check_mysql_slave.cfg
+    - check_mysql.cfg
+  notify:
+    - restart nagios-nrpe-server
+  when: nrpe_proxy is defined
+  tags:
+    - nrpe
+
+- name: copy nagios check scripts
+  copy: 
+    dest=/etc/nagios/nrpe.d/{{ item }}
+    src={{ item }}
+    backup=yes
+  with_items:
+    - check_mysql_slave.cfg
+    - check_mysql.cfg
+  notify:
+    - restart nagios-nrpe-server
+  tags:
+    - nrpe
+
+- name: set allow template
+  template:
+    src=xls_allow_xls.cfg.j2
+    dest=/etc/nagios/nrpe.d/xls_allow_xls.cfg
+    backup=yes
+  notify:
+    - restart nagios-nrpe-server
+  tags:
+    - nrpe
+
+- name: make sure nagios-nrpe-server is running
+  service:
+    name=nagios-nrpe-server
+    enabled=yes
+    state=started
+  tags:
+    - nrpe

@@ -1,0 +1,50 @@
+---
+
+- name: install keepalived
+  apt: 
+    pkg=keepalived
+    state=installed
+  tags:
+    - keepalived
+  
+
+- name: set keepalived template
+  template:
+    src=keepalived.conf.j2
+    dest=/etc/keepalived/keepalived.conf
+    backup=yes
+  notify:
+    - reload keepalived
+  tags:
+    - keepalived
+  
+- name: Ensure keepalived is running
+  service: 
+    name=keepalived 
+    state=running
+    pattern=/usr/sbin/keepalived    
+  tags:
+    - keepalived
+  
+- name: set ipforwarding 
+  sysctl:
+   name="net.ipv4.ip_forward" 
+   value=1 
+   sysctl_set=yes 
+   state=present 
+   reload=yes
+   sysctl_file=/etc/sysctl.conf
+  tags:
+    - keepalived
+  
+- name: set ip nonlocal bind 
+  sysctl:
+   name="net.ipv4.ip_nonlocal_bind" 
+   value=1 
+   sysctl_set=yes 
+   state=present 
+   reload=yes
+   sysctl_file=/etc/sysctl.conf
+  tags:
+    - keepalived
+  

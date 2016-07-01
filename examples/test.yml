@@ -1,0 +1,16 @@
+---
+
+- hosts: localhost
+
+  tasks:
+
+  - name: delete file
+    file:
+      path=/tmp/superfile
+      state=absent
+
+  - name: delete dir
+    file:
+      path=/tmp/superdir
+      state=absent
+

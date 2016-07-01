@@ -1,0 +1,4 @@
+[drbd]
+drbd1 ansible_ssh_host=185.3.211.56
+drbd2 ansible_ssh_host=185.3.211.85
+

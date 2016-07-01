@@ -1,0 +1,44 @@
+---
+
+- name: install memcached packages
+  apt:
+    pkg=memcached
+    state=installed
+  register: memcached_install
+  tags:
+    - memcached
+
+- name: push external memcached configuration template
+  template:
+    src={{ memcached_external_template }}
+    dest=/etc/memcached.conf
+    mode=0640
+    owner=root
+    group=root
+    backup=yes
+  notify:
+  - reload memcached
+  when: memcached_external_template is defined
+  tags:
+    - memcached
+
+- name: push external memcached configuration file
+  copy:
+    src={{ memcached_external_file }}
+    dest=/etc/memcached.conf
+    mode=0640
+    owner=root
+    group=root
+    backup=yes
+  notify:
+  - reload memcached
+  when: memcached_external_file is defined
+  tags:
+    - memcached
+
+- name: ensure memcachedd is running
+  service:
+    name=memcached
+    state=started
+  tags:
+    - memcached

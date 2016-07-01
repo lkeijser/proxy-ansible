@@ -1,0 +1,25 @@
+{% set serveraliases 	= item.value.serveraliases|default(false) %}
+{% set version 		= apache_version.stdout %}
+<VirtualHost *:80>
+     ServerName {{ item.value.name }}
+     DocumentRoot {{ item.value.docroot }}
+{% if serveraliases -%}
+{% for alias in serveraliases %}
+     ServerAlias {{ alias }}
+{% endfor %}
+{% endif %}
+     <Directory {{ item.value.docroot }}>
+          Options FollowSymLinks MultiViews
+          AllowOverride All
+{% if version >= '2.4' %}
+          Require all granted
+{% else %}
+          Order allow,deny
+          allow from all
+{% endif %}
+     </Directory>
+
+     ErrorLog /var/log/apache2/{{ item.value.name }}_error.log
+     LogLevel warn
+     CustomLog /var/log/apache2/{{ item.value.name }}_access.log combined
+</VirtualHost>

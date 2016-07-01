@@ -1,0 +1,13 @@
+---
+
+ip4tables:
+  filter:
+    - '-A INPUT -i lo -j ACCEPT'
+    - '-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT'
+    - '-A INPUT -m udp -p udp --dport 5405 -s 10.70.35.0/24 -j ACCEPT -m comment --comment "corosync traffic"'
+    - '-A INPUT -p icmp -j ACCEPT'
+    - '-A INPUT -m tcp -p tcp --dport 7788 -s 10.70.35.0/24 -m comment --comment "allow DRBD traffic" -j ACCEPT'
+    - '-A INPUT -m tcp -p tcp -m multiport --dports 111,2049,32765,32766,32767,32769 -j ACCEPT -m comment --comment "allow NFS traffic"'
+    - '-A INPUT -m udp -p udp -m multiport --dports 111,2049,32765,32766,32767,32769 -j ACCEPT -m comment --comment "allow NFS traffic"'
+    - '-A INPUT -j REJECT'
+

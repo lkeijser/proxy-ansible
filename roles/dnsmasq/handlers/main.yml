@@ -1,0 +1,4 @@
+---
+
+- name: reload dnsmasq
+  shell: /etc/init.d/dnsmasq force-reload

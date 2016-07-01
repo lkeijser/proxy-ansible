@@ -1,0 +1,22 @@
+---
+
+- name: restart fluentd-agent
+  service: 
+    name=td-agent 
+    state=restarted
+  tags:
+    - fluentd
+
+- name: reload fluentd-agent
+  service: 
+    name=td-agent 
+    state=reloaded
+  tags:
+    - fluentd
+
+- name: stop fluentd-agent
+  service: 
+    name=td-agent 
+    state=stopped
+  tags:
+    - fluentd

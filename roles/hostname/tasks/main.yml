@@ -1,0 +1,8 @@
+---
+
+- name: set hostname
+  hostname:
+    name={{ hostname.name }}
+  when: hostname.name is defined
+  tags:
+    - hostname

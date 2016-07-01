@@ -1,0 +1,8 @@
+---
+# This playbook will rollout the postgresql nodes
+
+- hosts: hacluster
+  roles:
+    - {role: corosync, tags: corosync, host_group: "backends", heartbeat_hosts: ['c7-pcmk1', 'c7-pcmk2']}
+
+

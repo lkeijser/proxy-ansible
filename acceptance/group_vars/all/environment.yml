@@ -1,0 +1,2 @@
+# This prefixes path lookups, make sure it matches the directory name!
+target_environment: acceptance

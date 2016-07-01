@@ -1,0 +1,57 @@
+---
+
+- name: set mysql server server id
+  template:
+    src=replication.cnf.j2
+    dest=/etc/mysql/conf.d/replication.cnf
+    backup=yes
+  when: mysqlreplication is defined
+  notify:
+    - restart mysql
+  tags:
+    - mysql-replication
+
+# /usr/bin/mysql -e "GRANT REPLICATION SLAVE  ON *.* TO 'replication'@'range%' IDENTIFIED BY 'password';"
+# Creates database user 'repplication' and password, with REPLICATION SLAVE database privileges.
+# Set replication slave with access from cluster network
+- name: Set replication slave with access from cluster network
+  mysql_user:
+    name=replication
+    host={{ mysqlreplication.network }}
+    password={{ mysqlreplication.replicationpassword }}
+    priv=*.*:'REPLICATION SLAVE'
+    state=present
+  when: mysqlreplication is defined
+  tags:
+    - mysql-replication
+
+- name: get slave status
+  mysql_replication:
+    mode=getslave
+  register: slave_info
+  changed_when: False
+  ignore_errors: yes
+  tags:
+    - mysql-replication
+
+# /usr/bin/mysql -e "CHANGE MASTER TO master_host='masterip', master_user='replication',  master_password='password';"
+# Setup replication
+- name: set master host
+  mysql_replication:
+    mode=changemaster
+    master_host={{ mysqlreplication.master_host|default('False') }}
+    master_user=replication
+    master_password={{ mysqlreplication.replicationpassword }}
+  when: mysqlreplication is defined
+  when: slave_info.msg is defined
+  register: master_info
+  tags:
+    - mysql-replication
+
+- name: enable replication
+  mysql_replication:
+    mode=startslave
+  when: master_info is defined
+  when: master_info|changed
+  tags:
+    - mysql-replication

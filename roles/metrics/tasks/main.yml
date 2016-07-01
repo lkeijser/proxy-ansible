@@ -1,0 +1,49 @@
+---
+- name: Add the OS specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- include: RedHat.yml
+  when: ansible_os_family  == "RedHat"
+
+#copy configuration files
+- name: copy apache settings
+  template: src=apache2-graphite.conf.j2 dest={{graphite_site_conf}}
+  notify: restart apache
+
+- name: copy django/graphite settings
+  template: src=local_settings.py.j2 dest={{ graphite_conf }}/local_settings.py
+  notify: restart apache
+
+- name: setup carbon conf
+  template: src=carbon.conf.j2 dest=/etc/carbon/carbon.conf
+  notify: restart carbon-cache
+
+- name: setup storage schemas
+  copy: src=storage-schemas.conf dest=/etc/carbon/storage-schemas.conf
+  notify: restart carbon-cache
+
+#Setupd SQLite DB
+- name: find state of graphite db
+  command:  "graphite-manage inspectdb"
+  register: result
+  changed_when: False
+  become: yes
+  become_user: "{{ graphite_user }}"
+
+- name: prep graphite db
+  command: "graphite-manage syncdb --noinput"
+  when: result.stdout.find('account_mygraph') == -1
+  become: yes
+  become_user: "{{ graphite_user }}"
+
+# Setup grafana
+- name: setup grafana
+  template: src=grafana.ini.j2 dest=/etc/grafana/grafana.ini
+  notify: restart grafana-server
+
+- name: enable httpd, carbon, grafana-server
+  service: name={{ item }} enabled=yes state=started
+  with_items:
+  - "{{ apache_service }}"
+  - grafana-server
+  - carbon-cache

@@ -1,0 +1,37 @@
+packages:
+  - graphite-web
+  - httpd
+  - python-carbon
+  - python-yaml
+  - grafana
+
+graphite_log_rendering_performance: no
+graphite_log_cache_performance: no
+graphite_log_metric_access: no
+graphite_timezone: UTC
+
+apache_service: httpd
+carbon_local_data_dir: /var/lib/carbon/whisper
+carbon_service: carbon-cache
+carbon_storage_dir: /var/lib/carbon
+carbon_user: carbon
+
+graphite_user: apache
+graphite_conf: /etc/graphite-web
+graphite_site_conf: /etc/httpd/conf.d/graphite-web.conf
+
+graphite_content_dir: /usr/share/graphite/webapp/content
+graphite_index_file: "{{ graphite_var }}/search_index"
+graphite_log_dir: /var/log/graphite-web
+graphite_python: /usr/lib/python2.7/site-packages/graphite
+graphite_storage_dir: "{{ graphite_var }}"
+graphite_var: /var/lib/graphite-web
+graphite_whisper_dir: "{{ carbon_local_data_dir }}"
+
+graphite_secret_key: T1NpLLaEORjT6Z2Ej08G5R35B+DuCEQvu1ZiIe8oUe
+graphite_ui_port: 3001
+grafana_ui_port: 3000
+
+grafana_org_name: Certo
+grafana_log_dir: /var/log/grafana
+grafana_data_dir: /var/lib/grafana

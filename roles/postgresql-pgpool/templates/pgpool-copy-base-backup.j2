@@ -1,0 +1,40 @@
+#! /bin/sh
+DATA=$1
+RECOVERY_TARGET=$2
+RECOVERY_DATA=$3
+
+# Stop remote postgres and remove current base
+logger "Stopping remote postgres service and removing PG data on ${RECOVERY_TARGET}"
+ssh -t postgres@${RECOVERY_TARGET} -- "
+service postgresql stop;
+rm -rf ${RECOVERY_DATA}/*
+"
+
+# Remove trigger file just in case one was placed by accident
+rm /var/lib/postgresql/9.3/main/trigger
+
+# Start backup (this leaves a marker and forces a disk write)
+logger "Starting pg_start_backup()"
+psql -c "select pg_start_backup('pgpool-recovery')" postgres
+
+# Create a recovery file
+logger "Creating recovery file in /var/lib/postgresql/9.3/main/recovery.conf"
+echo "
+restore_command = 'scp {{postgresql.ip}}:/var/lib/postgresql/9.3/main/pg_archive/%f %p'
+standby_mode = 'on'
+primary_conninfo = 'host={{postgresql.ip}} user=replication password=replication'
+trigger_file = '/var/lib/postgresql/9.3/main/trigger'
+" > /var/lib/postgresql/9.3/main/recovery.conf
+
+# Archive the base dir
+logger "Archiving the Postgres base directory. This may take a very long time."
+tar -C /var/lib/postgresql/9.3/main/ -zcf pgsql.tar.gz .
+psql -c 'select pg_stop_backup()' postgres
+
+# Delete the generated recovery.conf to prevent the source node from thinking it needs to recover
+logger "Remove recovery.conf from the still functional node"
+rm /var/lib/postgresql/9.3/main/recovery.conf
+
+# Transfer the files to the node that needs recovering
+logger "Transfering postgres data to new node"
+scp pgsql.tar.gz $RECOVERY_TARGET:$RECOVERY_DATA
