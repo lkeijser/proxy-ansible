@@ -1,7 +1,2 @@
-[webserver]
-web01.example.com
-web02.example.com
-
-[sqlserver]
-sql01.example.com
-sql02.example.com
+[test]
+rhel-1      ansible_host=192.168.124.27

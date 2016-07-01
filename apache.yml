@@ -1,0 +1,20 @@
+---
+
+- hosts: test
+
+  tasks:
+  - name:  install apache
+    yum:
+      pkg=httpd
+      state=present
+
+  - name: copy apache conf
+    copy:
+      src={{ target_environment }}/files/test/httpd.conf
+      dest=/etc/httpd/conf/httpd.conf
+
+  - name: ensure apache service is running and enabled at boottime
+    service:
+      name=httpd
+      enabled=yes
+      state=running
