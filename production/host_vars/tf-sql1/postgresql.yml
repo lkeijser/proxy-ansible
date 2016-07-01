@@ -1,5 +1,0 @@
----
-
-postgresql:
-  status: MASTER
-  ip: 10.70.35.45

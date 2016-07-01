@@ -1,4 +1,7 @@
-[drbd]
-drbd1 ansible_ssh_host=185.3.211.56
-drbd2 ansible_ssh_host=185.3.211.85
+[webserver]
+web01.example.com
+web02.example.com
 
+[sqlserver]
+sql01.example.com
+sql02.example.com

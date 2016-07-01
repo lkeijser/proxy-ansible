@@ -1,5 +1,0 @@
----
-
-postgresql:
-  status: SLAVE
-  ip: 10.70.35.46
